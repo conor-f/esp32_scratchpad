@@ -11,7 +11,12 @@ char LETTER_COORD_MAP[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'};
 int previous_board_state[8][8];
 int current_board_state[8][8];
 
+bool board_state[8][8] = {false};
 
+
+// Must be over this much away from normal to be considered to have a piece above it.
+int PRESENCE_THRESHOLD = 150;
+int BASE_LEVEL = 1088;
 
 
 void setup() {
@@ -50,13 +55,41 @@ void update_board_state() {
   }
 }
 
+void set_board_state() {
+  for (int i=0; i<8; i++) {
+    for (int j=0; j<8; j++) {
+      int square_value = readMux((8 * i) + j);
+
+      if (abs(square_value - BASE_LEVEL) > PRESENCE_THRESHOLD) {
+        board_state[i][j] = true;
+      } else {
+        board_state[i][j] = false;
+      } 
+    }
+  }
+}
+
+void print_board_state() {
+  for (int i=0; i<8; i++) {
+    for (int j=0; j<8; j++) {
+       Serial.print(board_state[i][j]);
+    }
+    Serial.println();
+  }
+}
+
 void print_board_changes() {
   for (int i=0; i<8; i++) {
     for (int j=0; j<8; j++) {
       if (abs(current_board_state[i][j] - previous_board_state[i][j]) > 30) {
         Serial.print("Change Detected: ");
         Serial.print(LETTER_COORD_MAP[i]);
-        Serial.println(j+1);
+        Serial.print(j+1);
+        Serial.print(" (");
+        Serial.print(previous_board_state[i][j]);
+        Serial.print(" -> ");
+        Serial.print(current_board_state[i][j]);
+        Serial.println(" )");
       }
     }
   }
@@ -102,10 +135,38 @@ int readMux(int channel) {
   return adc1_get_raw(ADC1_CHANNEL_5);
 }
 
+/*
 void loop() {
   update_board_state();
   print_board_changes();
   delay(100);
+
+  /*
+  for(int i = 0; i < 3; i ++){
+    Serial.print("Value at channel ");
+    Serial.print(i);
+    Serial.print(" is : ");
+    Serial.println(readMux(i));
+    delay(1000);
+  }
+}
+  */
+
+int c = 0;
+
+void loop() {
+  set_board_state();
+  delay(100);
+
+  if (c % 50 == 0) {
+    Serial.println();
+    Serial.println();
+    print_board_state();
+  }
+
+  c = (c % 100) + 1;
+
+  //# print_board_changes();
 
   /*
   for(int i = 0; i < 3; i ++){
