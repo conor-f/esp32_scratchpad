@@ -42,7 +42,7 @@ void setup() {
   pgnCreator.end_game(WHITE_WIN);
 
   // Upload the PGN to Lichess
-  String lichessToken = "lip_gZtEd03ONprcrlUMSL4a"; // Replace with your actual Lichess API token
+  String lichessToken = ""; // Replace with your actual Lichess API token
   if (pgnCreator.upload_to_lichess(lichessToken)) {
     Serial.println("PGN uploaded successfully.");
   } else {
