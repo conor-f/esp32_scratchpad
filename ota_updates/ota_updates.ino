@@ -1,7 +1,9 @@
 #include <ArduinoOTA.h>
+#include <time.h>
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <WiFiManager.h>  // https://github.com/tzapu/WiFiManager
+#include <HTTPClient.h>
 #include "PGNCreator.h"
 
 String HOSTNAME = "esp32-chessboard";
@@ -98,11 +100,60 @@ void init_ota() {
   ArduinoOTA.begin();
 }
 
+void sync_time_with_ntp() {
+  WiFiUDP ntpUDP;
+  NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, 60000); // Update every 60 seconds
+  timeClient.begin();
+
+  while (!timeClient.update()) {
+    timeClient.forceUpdate();
+  }
+
+  struct timeval tv;
+  tv.tv_sec = timeClient.getEpochTime();
+  tv.tv_usec = 0;
+  settimeofday(&tv, nullptr);
+
+  Serial.println("Time synchronized with NTP server.");
+}
+
+void log_to_loki(String logMessage) {
+  HTTPClient http;
+  http.begin("http://loki.randombits.host/loki/api/v1/push");
+  http.addHeader("Content-Type", "application/json");
+
+  String payload = "{\"streams\": [{\"stream\": {\"source\": \"esp32\"}, \"values\": [[\"" + String(get_current_time_ns()) + "\", \"" + logMessage + "\"]]}]}";
+  
+  int httpResponseCode = http.POST(payload);
+
+  if (httpResponseCode >= 200 && httpResponseCode < 300) {
+    Serial.printf("Loki Response code: %d\n", httpResponseCode);
+  } else {
+    Serial.println("Error sending log to Loki:");
+    Serial.printf("HTTP Response code: %d\n", httpResponseCode);
+    Serial.printf("Error: %s\n", http.errorToString(httpResponseCode).c_str());
+    Serial.printf("Request URL: %s\n", "http://loki.randombits.host/loki/api/v1/push");
+    Serial.printf("Payload: %s\n", payload.c_str());
+  }
+
+  http.end();
+}
+
+unsigned long long get_current_time_ns() {
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+
+  int64_t epoch_time_ns = ts.tv_sec * 1e9 + ts.tv_nsec;
+  return (unsigned long long) epoch_time_ns;
+}
+
+
 void setup() {
   Serial.begin(115200); 
 
   init_wifi();
   init_ota();
+  sync_time_with_ntp();
 }
 
 
@@ -114,11 +165,14 @@ unsigned long print_watcher = 0;
 void loop() {
   ArduinoOTA.handle();
 
-  unsigned long elapsed = millis();
+  // unsigned long elapsed = millis();
 
-  if (elapsed -  print_watcher >= 5000) {
-    Serial.println("Basic...");
-    Serial.println("ADVANCED!...");
-    print_watcher = elapsed;
-  }
+  // if (elapsed -  print_watcher >= 10000) {
+  //   String message1 = "Battery pack test...";
+  //   
+  //   Serial.println(message1);
+  //   log_to_loki(message1);
+
+  //   print_watcher = elapsed;
+  // }
 }
